@@ -3,6 +3,7 @@ import streamlit as st
 import matplotlib.pyplot as plt
 import seaborn as sns
 from io import StringIO
+from datetime import timedelta
 
 st.set_page_config(layout="wide")
 st.title("📊 Libre2 CGM Dashboard")
@@ -20,20 +21,29 @@ if uploaded_file is not None:
     # Glucose unification (pick available column)
     df["Glucose (mmol/L)"] = df["Scan Glucose mmol/L"].combine_first(df["Historic Glucose mmol/L"])
 
-    # Sidebar filters
-    st.sidebar.header("🔍 Filter Data")
-    min_date = df["Device Timestamp"].min()
-    max_date = df["Device Timestamp"].max()
-    date_range = st.sidebar.date_input("Select date range", [min_date, max_date])
+    # Detect consecutive 14-day windows of data
+    df['Sensor Period'] = (df['Device Timestamp'].diff() > timedelta(hours=8)).cumsum()
+    sensors = df['Sensor Period'].unique()
+
+    st.sidebar.header("📅 Sensor Sessions")
+    sensor_selection = st.sidebar.selectbox("Select a 2-week session", sensors)
+    session_df = df[df['Sensor Period'] == sensor_selection]
+
+    # Date filtering within selected sensor period
+    min_date = session_df["Device Timestamp"].min().date()
+    max_date = session_df["Device Timestamp"].max().date()
+    date_range = st.sidebar.date_input("Select date range within session", [min_date, max_date], min_value=min_date, max_value=max_date)
+
+    # Glucose range and notes keyword
     glucose_min = st.sidebar.slider("Minimum Glucose (mmol/L)", 0.0, 20.0, 0.0)
     glucose_max = st.sidebar.slider("Maximum Glucose (mmol/L)", 0.0, 20.0, 20.0)
     keyword = st.sidebar.text_input("Search Notes")
 
     # Apply filters
-    filtered_df = df[
-        (df["Device Timestamp"].dt.date >= date_range[0]) &
-        (df["Device Timestamp"].dt.date <= date_range[1]) &
-        (df["Glucose (mmol/L)"].between(glucose_min, glucose_max))
+    filtered_df = session_df[
+        (session_df["Device Timestamp"].dt.date >= date_range[0]) &
+        (session_df["Device Timestamp"].dt.date <= date_range[1]) &
+        (session_df["Glucose (mmol/L)"].between(glucose_min, glucose_max))
     ]
     if keyword:
         filtered_df = filtered_df[filtered_df["Notes"].fillna("").str.contains(keyword, case=False)]
@@ -59,12 +69,10 @@ if uploaded_file is not None:
     ax.legend()
     st.pyplot(fig)
 
-    # Expandable Notes Table
+    # Notes table below chart
     if filtered_df["Notes"].notnull().sum() > 0:
-        st.subheader("📝 Filtered Notes Table")
-        for _, row in filtered_df[filtered_df["Notes"].notnull()].iterrows():
-            with st.expander(f"{row['Device Timestamp']} | {row['Glucose (mmol/L)']:.2f} mmol/L"):
-                st.write(row['Notes'])
+        st.subheader("📝 Notes Below Chart")
+        st.dataframe(filtered_df[filtered_df["Notes"].notnull()][["Device Timestamp", "Glucose (mmol/L)", "Notes"]].reset_index(drop=True))
 
     # Export option
     csv = filtered_df.to_csv(index=False)
@@ -77,3 +85,4 @@ if uploaded_file is not None:
 
 else:
     st.info("Please upload a CGM CSV file to begin.")
+
