@@ -74,6 +74,11 @@ if uploaded_file is not None:
         st.subheader("📝 Notes Below Chart")
         st.dataframe(filtered_df[filtered_df["Notes"].notnull()][["Device Timestamp", "Glucose (mmol/L)", "Notes"]].reset_index(drop=True))
 
+    # Full session notes list (0-3 sessions)
+    st.subheader("🗂️ Full Notes for Sessions 0–3")
+    full_notes_df = df[df["Sensor Period"].isin([0, 1, 2, 3]) & df["Notes"].notnull()]
+    st.dataframe(full_notes_df[["Device Timestamp", "Glucose (mmol/L)", "Sensor Period", "Notes"]].reset_index(drop=True))
+
     # Export option
     csv = filtered_df.to_csv(index=False)
     st.download_button(
@@ -85,4 +90,3 @@ if uploaded_file is not None:
 
 else:
     st.info("Please upload a CGM CSV file to begin.")
-
