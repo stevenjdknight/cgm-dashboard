@@ -8,9 +8,18 @@ from datetime import timedelta
 st.set_page_config(layout="wide")
 st.title("📊 Libre2 CGM Dashboard")
 
-# File uploader
-uploaded_file = st.file_uploader("Upload your CGM CSV file", type=["csv"])
+# Simple password protection
+password = st.text_input("🔒 Enter password to access dashboard:", type="password")
+if password not in ["diamond", "amanda2025"]:
+    st.warning("Please enter a valid password.")
+    st.stop()
 
+# File uploader or fallback
+uploaded_file = st.file_uploader("Upload your CGM CSV file", type=["csv"])
+if uploaded_file is None:
+    uploaded_file = "CGM_Dashboard_Data.csv"
+
+# Load data
 if uploaded_file is not None:
     df = pd.read_csv(uploaded_file)
 
